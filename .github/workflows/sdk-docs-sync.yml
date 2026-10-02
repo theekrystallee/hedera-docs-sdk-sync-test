@@ -34,7 +34,7 @@ concurrency:
 jobs:
   sync:
     name: sync (${{ matrix.sdk }})
-    runs-on: hashgraph-docs-linux-medium
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
