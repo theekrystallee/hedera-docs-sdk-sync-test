@@ -1,0 +1,146 @@
+name: SDK Docs Sync
+
+# Keeps the native SDK docs in step with the hiero-ledger SDK repos (the source of
+# truth). One job per SDK: when a newer stable release exists than the version
+# recorded in .github/sdk-sync/<sdk>.json, bump the install pins in the docs and
+# open (or refresh) a PR whose body lists every API and breaking change the docs
+# still need to reflect. Logic lives in .github/scripts/sdk-sync.js.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sdk:
+        description: 'SDK to sync'
+        required: false
+        default: all
+        type: choice
+        options: [all, js, java, go, python, swift, rust, cpp]
+      from:
+        description: 'Override the baseline version (e.g. 2.76.0) to re-report older changes. Requires a single SDK.'
+        required: false
+        type: string
+  schedule:
+    # Daily at 08:00 UTC, after the node table (06:00) and mirror node (07:00) jobs.
+    - cron: '0 8 * * *'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: sync (${{ matrix.sdk }})
+    runs-on: hashgraph-docs-linux-medium
+    strategy:
+      fail-fast: false
+      matrix:
+        sdk: ${{ fromJSON(inputs.sdk && inputs.sdk != 'all' && format('["{0}"]', inputs.sdk) || '["js","java","go","python","swift","rust","cpp"]') }}
+    env:
+      BRANCH: automation/sdk-sync-${{ matrix.sdk }}
+
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout docs repo
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '22'
+
+      # create-pull-request force-pushes its branch, which would wipe doc fixes a
+      # reviewer pushed to an open sync PR. Leave such a PR alone until it merges.
+      - name: Check for reviewer commits on the sync branch
+        id: guard
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$(git ls-remote --heads origin "${BRANCH}")" ]]; then
+            echo "No existing ${BRANCH} branch."
+            echo "skip=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          authors="$(gh api "repos/${GITHUB_REPOSITORY}/compare/${GITHUB_REF_NAME}...${BRANCH}" \
+            --jq '[.commits[].commit.author.email] | unique | .[]')"
+          others="$(grep -v '^41898282+github-actions\[bot\]@users\.noreply\.github\.com$' <<<"${authors}" || true)"
+          if [[ -n "${others}" ]]; then
+            echo "::warning::${BRANCH} has commits from reviewers (${others//$'\n'/, }). Not refreshing it; merge or close that PR first."
+            echo "skip=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "skip=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Sync docs with the latest release
+        id: sync
+        if: steps.guard.outputs.skip != 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SDK: ${{ matrix.sdk }}
+          FROM: ${{ inputs.from }}
+          ALL: ${{ inputs.sdk == '' || inputs.sdk == 'all' }}
+        run: |
+          set -euo pipefail
+          args=(--sdk "${SDK}" --report "${RUNNER_TEMP}/sdk-sync-${SDK}.md")
+          if [[ -n "${FROM}" ]]; then
+            if [[ "${ALL}" == 'true' ]]; then
+              echo "The 'from' input requires a single SDK to be selected." >&2
+              exit 1
+            fi
+            args+=(--from "${FROM}")
+          fi
+          node .github/scripts/sdk-sync.js "${args[@]}"
+
+      - name: Validate MDX compiles
+        if: steps.sync.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(git diff --name-only -- '*.mdx')
+          if [[ ${#files[@]} -eq 0 ]]; then
+            echo "No MDX files changed."
+            exit 0
+          fi
+          npm install --no-save @mdx-js/mdx@3.1.1
+          node .github/scripts/check-mdx-compiles.js "${files[@]}"
+
+      - name: Publish report to the job summary
+        if: steps.sync.outputs.changed == 'true'
+        run: cat "${{ steps.sync.outputs.body }}" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload full report
+        if: steps.sync.outputs.changed == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sdk-sync-report-${{ matrix.sdk }}
+          path: ${{ steps.sync.outputs.report }}
+
+      - name: Open pull request
+        if: steps.sync.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          add-paths: |
+            .github/sdk-sync/${{ matrix.sdk }}.json
+            .github/scripts/java-gradle-bootstrap.sh
+            *.mdx
+          commit-message: "docs: sync ${{ steps.sync.outputs.name }} docs to v${{ steps.sync.outputs.to }}"
+          author: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
+          committer: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
+          signoff: true
+          sign-commits: true
+          branch: ${{ env.BRANCH }}
+          title: "docs: sync ${{ steps.sync.outputs.name }} docs to v${{ steps.sync.outputs.to }}"
+          body-path: ${{ steps.sync.outputs.body }}
+          labels: automated-pr
+          delete-branch: true
