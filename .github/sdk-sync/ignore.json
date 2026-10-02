@@ -1,0 +1,32 @@
+{
+  "classes": [
+    { "name": "AbstractTokenTransferTransaction", "reason": "Internal base class; its methods are documented on the concrete transactions." },
+    { "name": "AirdropPendingTransaction", "reason": "Internal base class for the airdrop cancel/claim transactions." },
+    { "name": "AnySchedulableTransaction", "reason": "Swift type-erasure wrapper, not a transaction developers build." },
+    { "name": "AnyTransaction", "reason": "Swift type-erasure wrapper, not a transaction developers build." },
+    { "name": "ChunkedTransaction", "reason": "Internal base class for chunked transactions (file append, topic message submit)." },
+    { "name": "CostQuery", "reason": "Internal helper behind Query.getCost()." },
+    { "name": "MirrorNodeContractQuery", "reason": "Base class of MirrorNodeContractCallQuery and MirrorNodeContractEstimateGasQuery." },
+    { "name": "MirrorQuery", "reason": "Swift internal base class for mirror node queries." },
+    { "name": "PaymentTransaction", "reason": "Internal query-payment transaction." },
+    { "name": "WrappedTransaction", "reason": "C++ internal wrapper type." },
+    { "name": "TokenNftsUpdateTransaction", "reason": "JS spelling of TokenUpdateNftsTransaction, which is documented." },
+    { "name": "TokenUpdateNftTransaction", "reason": "Swift spelling of TokenUpdateNftsTransaction, which is documented." },
+    { "name": "TransactionGetReceiptQuery", "reason": "Python spelling of TransactionReceiptQuery, which is documented." },
+    { "name": "LiveHashAddTransaction", "reason": "Live hashes are not supported by the network. Confirm before documenting." },
+    { "name": "LiveHashDeleteTransaction", "reason": "Live hashes are not supported by the network. Confirm before documenting." },
+    { "name": "LiveHashQuery", "reason": "Live hashes are not supported by the network. Confirm before documenting." },
+    { "name": "NodeCreateTransaction", "reason": "Requires governing council or node-operator keys; left out of the SDK docs (decided 2026-10-02)." },
+    { "name": "NodeUpdateTransaction", "reason": "Requires governing council or node-operator keys; left out of the SDK docs (decided 2026-10-02)." },
+    { "name": "NodeDeleteTransaction", "reason": "Requires governing council or node-operator keys; left out of the SDK docs (decided 2026-10-02)." },
+    { "name": "RegisteredNodeCreateTransaction", "reason": "Requires governing council or node-operator keys; left out of the SDK docs (decided 2026-10-02)." },
+    { "name": "RegisteredNodeUpdateTransaction", "reason": "Requires governing council or node-operator keys; left out of the SDK docs (decided 2026-10-02)." },
+    { "name": "RegisteredNodeDeleteTransaction", "reason": "Requires governing council or node-operator keys; left out of the SDK docs (decided 2026-10-02)." },
+    { "name": "FreezeTransaction", "reason": "Network freeze is a privileged council operation." },
+    { "name": "SystemDeleteTransaction", "reason": "Privileged system operation." },
+    { "name": "SystemUndeleteTransaction", "reason": "Privileged system operation." }
+  ],
+  "methods": [
+    { "name": "setProxyAccountId", "reason": "Deprecated; proxy staking was replaced by HIP-406 staking." }
+  ]
+}
